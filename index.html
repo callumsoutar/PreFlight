@@ -445,60 +445,22 @@ legend.addTo(map);
         // Set interval to fetch new data every 30 minutes (1800000 ms)
         setInterval(fetchMetarData, 1800000); // 30 minutes
 
-        // Add these URL constants before the scrapeTafInfo function
-        const URL = 'https://www.ifis.airways.co.nz/script/briefing/met_briefing_proc.asp';
-        const LOGIN_URL = 'https://www.ifis.airways.co.nz/secure/script/user_reg/login_proc.asp';
+        const CORS_PROXY = 'https://corsproxy.io/?';  // Using a different CORS proxy
+        const URL = CORS_PROXY + encodeURIComponent('https://www.ifis.airways.co.nz/script/briefing/met_briefing_proc.asp');
+        const LOGIN_URL = CORS_PROXY + encodeURIComponent('https://www.ifis.airways.co.nz/secure/script/user_reg/login_proc.asp');
 
         async function scrapeTafInfo(airportCode) {
-            const username = 'Callum';
-            const password = '21Everest';
-
             try {
-                // First, login to the site
-                const loginPayload = new URLSearchParams();
-                loginPayload.append('UserName', username);
-                loginPayload.append('Password', password);
-
-                await fetch(LOGIN_URL, {
-                    method: 'POST',
-                    body: loginPayload,
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    mode: 'no-cors'
-                });
-
-                // Then, request the TAF data
-                const dataPayload = new URLSearchParams();
-                dataPayload.append('TAF', '1');
-                dataPayload.append('MetLocations', airportCode);
-
-                const tafResponse = await fetch(URL, {
-                    method: 'POST',
-                    body: dataPayload,
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    mode: 'no-cors'
-                });
-
-                console.log('TAF Response:', tafResponse);
+                const response = await fetch(`http://localhost:5000/taf/${airportCode}`);
+                const data = await response.json();
                 
-                const responseText = await tafResponse.text();
-                console.log('TAF Response Text:', responseText);
-
-                // Extract the TAF using a regular expression
-                const match = responseText.match(/<span class="metText">(.*?)<\/span>/s);
-
-                let taf = {};
-
-                if (match) {
-                    let tafRaw = match[1];
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(tafRaw, 'text/html');
-                    let tafCleaned = doc.body.textContent.trim();
-                    tafCleaned = tafCleaned.replace(/\s+/g, ' ').replace(/&nbsp;/g, ' ');
-                    taf[airportCode] = { raw_text: tafCleaned };
+                console.log('TAF Response:', data);
+                
+                if (data.success) {
+                    return data.taf;
+                } else {
+                    throw new Error(data.error || 'Failed to fetch TAF');
                 }
-
-                return taf;
-
             } catch (error) {
                 console.error('Detailed error:', error);
                 throw new Error(`Error fetching TAF for ${airportCode}: ${error.message}`);
